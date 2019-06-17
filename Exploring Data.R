@@ -1,12 +1,14 @@
-# Exploring and Cleaning Data
-train <- read.csv("sales_train_v2.csv")
-items <- read.csv("items.csv")
-test <- read.csv("test.csv")
+# Loading Libraries
 library(dplyr)
 library(lubridate)
 library(ggplot2)
 library(reshape)
 library(gbm)
+
+# Loading and Cleaning Data
+train <- read.csv("sales_train_v2.csv")
+items <- read.csv("items.csv")
+test <- read.csv("test.csv")
 
 merged.train <- merge.data.frame(train, items, by = c("item_id"))
 merged.train$item_name <- NULL
@@ -24,10 +26,11 @@ train$day <- day(train$date)
 train$weekday <- weekdays(train$date)
 train$year <- as.factor(train$year)
 train$weekday <- as.factor(train$weekday)
+train$month <- as.factor(train$month)
+train$day <- as.factor(train$day)
 
 cnt_month <- train %>% group_by(year, month, shop_id, item_id) %>% summarise(item_cnt_month = sum(item_cnt_day)) %>% ungroup()
 train <- train %>% left_join(cnt_month, by = c("year", "month", "shop_id", "item_id"))
-str(train)
 rm(cnt_month)
 
 #understand new data, check correlation
@@ -39,10 +42,7 @@ train_numcols$date_block_num <- NULL
 train_numcols$month <- NULL
 train_numcols$day <- NULL
 cor(train_numcols)
-str(train_numcols)
-
 correlation = melt(cor(train_numcols))
-
 
 ggplot(data = correlation, aes(x = X1, y = X2, fill = value))+
   geom_tile()+
@@ -99,7 +99,7 @@ ggplot(best_selling_items,
 
 # Modelling
 gbm_model  =  gbm(item_cnt_day ~ shop_id + item_id,
-                  data = sales_data,
+                  data = train,
                   shrinkage = 0.01,
                   distribution = "gaussian",
                   n.trees = 5000,
@@ -110,15 +110,12 @@ gbm_model  =  gbm(item_cnt_day ~ shop_id + item_id,
                   n.cores = NULL,
                   verbose = T)
 
-end = Sys.time()
-print(end - start)
+result = predict(gbm_model,newdata = test[,c("shop_id","item_id")], n.trees = 5000 )
 
-result2 = predict(gbm_model,newdata = test_data[,c("shop_id","item_id")], n.trees = 5000 )
+submission = data.frame(ID = test$ID, 
+                  item_cnt_month =  result)
 
-sub2 = data.frame(ID = test_data$ID, 
-                  item_cnt_month =  result2)
-
-write.csv(sub2, "submission.csv", row.names = F)
+write.csv(submission, "submission.csv", row.names = F)
   
   
   
